@@ -18,6 +18,25 @@ ACTION_SIZE = len(QUESTION_BANK)
 STATE_SIZE = NUM_TOPICS
 
 # --- Q-Network ---
+
+# INPUT: [x, y, z]
+#   x = mastery level in Topic 0 (e.g., addition)
+#   y = mastery level in Topic 1 (e.g., subtraction)
+#   z = mastery level in Topic 2 (e.g., multiplication)
+
+# Each value is between 0 and 1, with higher values = better mastery.
+
+# OUTPUT: [a, b, c, d, e, f]
+# Each value is the predicted Q-value (expected future reward) for asking a specific question:
+#   a = Topic 0, Easy Question
+#   b = Topic 0, Hard Question
+#   c = Topic 1, Easy Question
+#   d = Topic 1, Hard Question
+#   e = Topic 2, Easy Question
+#   f = Topic 2, Hard Question
+
+# These Q-values are used to select the best action (question to prompt) via argmax
+# They represent expected learning gain
 def build_model():
     model = tf.keras.Sequential([
         layers.Dense(32, input_dim=STATE_SIZE, activation='relu'),
@@ -30,32 +49,78 @@ def build_model():
 
 # --- Agent ---
 class DQNAgent:
+    # 
     def __init__(self):
-        self.memory = deque(maxlen=2000)
-        self.model = build_model()
-        self.epsilon = 1.0
-        self.epsilon_min = 0.05
-        self.epsilon_decay = 0.95
-        self.gamma = 0.95
-
+        # Stores past experiences as (state, action, reward, next_state, done)
+        # Used for experience replay to stabilize training
+        self.memory = deque(maxlen=2000)  
+        
+        # Deep neural network that predicts Q-values for all possible questions
+        # Input: current mastery state → Output: Q-values for each question
+        self.model = build_model()  
+        
+        # Exploration rate — initially 100%, meaning the agent picks random questions
+        self.epsilon = 1.0  
+        
+        # Minimum exploration rate — ensures at least 5% of questions remain randomized
+        self.epsilon_min = 0.05  
+        
+        # After each training round: epsilon *= epsilon_decay
+        # Gradually reduces randomness, so agent relies more on learned Q-values over time
+        self.epsilon_decay = 0.95  
+        
+        # Discount factor for future rewards in Q-learning
+        # Q(s, a) = reward + gamma * max(Q(next_state))
+        # - Small gamma → prioritize immediate learning gain (reward)
+        # - Large gamma → prioritize long-term learning gain (future mastery)
+        self.gamma = 0.95  
+    
+    # INPUT: [x, y, z]
+    # OUTPUT: index of the question
+    
+    # If epsilon is large enough, then a random question is picked from the question set 
+    # Otherwise, generate the Q-values list and choose the one with highest reward 
+    # The question associated with the highest reward provides the most potential for learning 
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(ACTION_SIZE)
         q_values = self.model.predict(state[np.newaxis, :], verbose=0)
-        return np.argmax(q_values[0])
+        return np.argmax(q_values[0]) #argmax provides index of the greatest Q-value in the list
 
+    # INPUT: state, action, reward, next_state, done 
+        # state: input vector [x, y, z] of mastery before the question
+        # action: index of question currently being prompted to student 
+        # reward: 0 or 1, whether the student was correct/incorrect 
+        # next_state: updated input vector [x2, y2, z2] of mastery after the question
+        # done: boolean checking if the session is over
+    #OUTPUT: appends these parameters in a tuple to the memory queue 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
+    
     def replay(self, batch_size=8):
+        # Skip training if memory queue doesn't have enough experiences 
         if len(self.memory) < batch_size:
             return
+        
+        #Choose a random sample of experiences from memory queue 
         minibatch = random.sample(self.memory, batch_size)
+
+        #Loop through each experience in the random sample 
         for state, action, reward, next_state, done in minibatch:
+            #Effectively saying, Q(s, a) = reward + gamma * max(Q(next_state))
             target = reward if done else reward + self.gamma * np.amax(self.model.predict(next_state[np.newaxis, :], verbose=0)[0])
+            
+            #Vector of current Q-values for this state 
             target_f = self.model.predict(state[np.newaxis, :], verbose=0)
+
+            #Update the Q-value for the question being prompted currently 
             target_f[0][action] = target
+
+            #Train the model after updating the Q-value vector 
             self.model.fit(state[np.newaxis, :], target_f, epochs=1, verbose=0)
+
+        #Decrease randomness rate each iteration
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
