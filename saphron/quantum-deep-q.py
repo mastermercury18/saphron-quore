@@ -2,13 +2,13 @@ import numpy as np
 import random
 from collections import deque
 import tensorflow as tf
-from tensorflow.keras import layers
-import sys
 
+from tensorflow.keras import layers
 from qiskit import Aer, QuantumCircuit, execute
 from qiskit.circuit.library import GroverOperator
 from qiskit.algorithms import AmplificationProblem, Grover
-import numpy as np
+
+import sys
 
 
 class Tee:
@@ -24,18 +24,30 @@ class Tee:
         self.terminal.flush()
         self.log.flush()
 
+# --- Grover's Oracle ---
+# Probabalistically amplifies multiple best actions for the RL agent and enables structured exploration of Q-Values
+# INPUT: [a, b, c, d, e, f]
+# Each value is the predicted Q-value (expected future reward) for asking a specific question:
+#   a = Topic 0, Easy Question
+#   b = Topic 0, Hard Question
+#   c = Topic 1, Easy Question
+#   d = Topic 1, Hard Question
+#   e = Topic 2, Easy Question
+#   f = Topic 2, Hard Question
 def grover_action_selection(q_values):
+    # Define the number of qubits and number of states 
     n_actions = len(q_values)
-    n_qubits = int(np.ceil(np.log2(n_actions)))
+    n_qubits = int(np.ceil(np.log2(n_actions))) # ex: 4 questions --> 2 qubits, 8 questions --> 3 qubits
     padded_len = 2 ** n_qubits
 
-    # Normalize and pad q-values
+    # Normalize Q-Values to a 0-1 range and pads Q-Value list to neatly fit into qubit states
     q_values = np.array(q_values)
     q_values = (q_values - q_values.min()) / (q_values.max() - q_values.min() + 1e-8)
-    padded_q = np.zeros(padded_len)
-    padded_q[:len(q_values)] = q_values
+    padded_q = np.zeros(padded_len) 
+    padded_q[:len(q_values)] = q_values # EX: Q-Value list with six entries will require 3 qubits, producing a padded list of eight 2 ** 3 = 8 entries
 
-    # Define "good states" as indices with near-max Q-value
+    # Define "good states" as indices with high Q-Value (above 0.95 * max(padded_q))
+    # These are target solutions that Grover's oracle will mark
     threshold = 0.95 * padded_q.max()
     good_indices = [i for i, val in enumerate(padded_q) if val >= threshold]
 
@@ -76,14 +88,15 @@ def grover_action_selection(q_values):
     result = execute(qc, backend=backend, shots=1).result()
     counts = result.get_counts()
     chosen_bin = max(counts, key=counts.get)
+
+
     action_index = int(chosen_bin, 2)
 
+    # Similar logic to epsilon-greedy approach, but uses amplitude amplification instead of np.random()
     return action_index if action_index < len(q_values) else np.argmax(q_values)
-
 
 sys.stdout = Tee("quantum_session_log.txt")
 sys.stderr = sys.stdout  # Redirect errors too
-
 
 # --- Math Questions Only ---
 QUESTION_BANK = [
