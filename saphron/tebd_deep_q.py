@@ -20,7 +20,7 @@ class Tee:
         self.terminal.flush()
         self.log.flush()
 
-sys.stdout = Tee("session_log2.txt")
+sys.stdout = Tee("session_log3.txt")
 sys.stderr = sys.stdout  # Redirect errors too
 
 
@@ -68,35 +68,7 @@ def build_model():
                   loss='mse')
     return model
 
-# --- Agent ---
-class DQNAgent:
-    # 
-    def __init__(self):
-        # Stores past experiences as (state, action, reward, next_state, done)
-        # Used for experience replay to stabilize training
-        self.memory = deque(maxlen=2000)  
-        
-        # Deep neural network that predicts Q-values for all possible questions
-        # Input: current mastery state → Output: Q-values for each question
-        self.model = build_model()  
-        
-        # Exploration rate — initially 100%, meaning the agent picks random questions
-        self.epsilon = 1.0  
-        
-        # Minimum exploration rate — ensures at least 5% of questions remain randomized
-        self.epsilon_min = 0.05  
-        
-        # After each training round: epsilon *= epsilon_decay
-        # Gradually reduces randomness, so agent relies more on learned Q-values over time
-        self.epsilon_decay = 0.95  
-        
-        # Discount factor for future rewards in Q-learning
-        # Q(s, a) = reward + gamma * max(Q(next_state))
-        # - Small gamma → prioritize immediate learning gain (reward)
-        # - Large gamma → prioritize long-term learning gain (future mastery)
-        self.gamma = 0.95  
-
-    def tebd_structured_action_selector(q_values, topics, difficulties, prev_action=None, bond_dim=4, dt=0.1, steps=3):
+def tebd_structured_action_selector(q_values, topics, difficulties, prev_action=None, bond_dim=4, dt=0.1, steps=3):
         """
         TEBD-based action selector with explicit structural encoding:
         - Entanglement is introduced between adjacent actions using 2-site gates
@@ -115,6 +87,8 @@ class DQNAgent:
         Returns:
             index of selected action
         """
+       
+        q_values = list(q_values)
         n = len(q_values)
         if n < 2:
             return 0
@@ -176,6 +150,34 @@ class DQNAgent:
         final_probs = np.array(final_probs)
         final_probs /= np.sum(final_probs)
         return int(np.random.choice(n, p=final_probs))
+
+# --- Agent ---
+class DQNAgent:
+    # 
+    def __init__(self):
+        # Stores past experiences as (state, action, reward, next_state, done)
+        # Used for experience replay to stabilize training
+        self.memory = deque(maxlen=2000)  
+        
+        # Deep neural network that predicts Q-values for all possible questions
+        # Input: current mastery state → Output: Q-values for each question
+        self.model = build_model()  
+        
+        # Exploration rate — initially 100%, meaning the agent picks random questions
+        self.epsilon = 1.0  
+        
+        # Minimum exploration rate — ensures at least 5% of questions remain randomized
+        self.epsilon_min = 0.05  
+        
+        # After each training round: epsilon *= epsilon_decay
+        # Gradually reduces randomness, so agent relies more on learned Q-values over time
+        self.epsilon_decay = 0.95  
+        
+        # Discount factor for future rewards in Q-learning
+        # Q(s, a) = reward + gamma * max(Q(next_state))
+        # - Small gamma → prioritize immediate learning gain (reward)
+        # - Large gamma → prioritize long-term learning gain (future mastery)
+        self.gamma = 0.95  
     
     # INPUT: [x, y, z]
     # OUTPUT: index of the question
@@ -183,10 +185,10 @@ class DQNAgent:
     # Generate the Q-values list and choose the one with highest reward 
     # Use the entanglement-correlations and structural encoding of TEBD to choose the most efficient actions
     def act(self, state):
-        q_values = self.model.predict(state[np.newaxis, :], verbose=0)
+        q_values = list(self.model.predict(state[np.newaxis, :], verbose=0))
         topics = [0, 1, 2]
         difficulties = ["easy", "medium", "hard"]
-        return tebd_structured_action_selector(q_values, topics, difficulties, prev_action=None, bond_dim=4, dt=0.1, steps=3)
+        return tebd_structured_action_selector(q_values, topics, difficulties)
 
     # INPUT: state, action, reward, next_state, done 
         # state: input vector [x, y, z] of mastery before the question
