@@ -216,10 +216,9 @@ def hybrid_grover_qaoa_action_selector(q_values, topics, difficulties,
 # OUTPUT: index of the question
 
 # Generate the Q-values list and choose the one with highest reward 
-# Use QAOA to determine the best actions to be taken (questions asked)
+# Use a combination of Grover's and QAOA to determine the best actions to be taken (questions asked)
 def act(self, state):
     q_values = self.model.predict(state[np.newaxis, :], verbose=0)
-    #return qaoa_action_selection(q_values)
     topics = [0, 1, 2]
     difficulties = ["easy", "medium", "hard"]
     return hybrid_grover_qaoa_action_selector(q_values, topics, difficulties,
@@ -235,7 +234,6 @@ def act(self, state):
 #OUTPUT: appends these parameters in a tuple to the memory queue 
 def remember(self, state, action, reward, next_state, done):
     self.memory.append((state, action, reward, next_state, done))
-
 
 def replay(self, batch_size=8):
     # Skip training if memory queue doesn't have enough experiences 
