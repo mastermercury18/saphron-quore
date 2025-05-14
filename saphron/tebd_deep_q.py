@@ -20,21 +20,44 @@ class Tee:
         self.terminal.flush()
         self.log.flush()
 
-sys.stdout = Tee("session_log4.txt")
+sys.stdout = Tee("session_log6.txt")
 sys.stderr = sys.stdout  # Redirect errors too
 
 
 # --- Math Questions Only ---
 QUESTION_BANK = [
-    {"question": "What is 6 + 3?", "options": ["6", "9", "12"], "answer": 1, "topic": 0, "difficulty": 0},       # basic addition
-    {"question": "What is 23 + 18?", "options": ["41", "35", "31"], "answer": 0, "topic": 0,  "difficulty": 1},
-    {"question": "What is 12 - 5?", "options": ["6", "7", "8"], "answer": 1, "topic": 1,  "difficulty": 0},      # subtraction
-    {"question": "What is 63 - 12", "options": ["34", "50", "51"], "answer": 2, "topic": 1,  "difficulty": 1},     # multiplication
-    {"question": "What is 3 * 2", "options": ["6", "5", "4"], "answer": 0, "topic": 2,  "difficulty": 1},      # division
-    {"question": "What is (2 + 3) * 2?", "options": ["10", "8", "12"], "answer": 2, "topic": 2, "difficulty": 2} # multi-step
+    {"question": "What is 5 + 7?", "options": ["12", "11", "13"], "answer": 0, "topic": 0, "difficulty": 0},
+    {"question": "What is 15 + 29?", "options": ["44", "43", "42"], "answer": 0, "topic": 0, "difficulty": 1},
+    {"question": "What is 103 + 208?", "options": ["311", "301", "321"], "answer": 0, "topic": 0, "difficulty": 2},
+
+    {"question": "What is 12 - 7?", "options": ["5", "4", "6"], "answer": 0, "topic": 1, "difficulty": 0},
+    {"question": "What is 63 - 28?", "options": ["35", "34", "36"], "answer": 0, "topic": 1, "difficulty": 1},
+    {"question": "What is 523 - 109?", "options": ["414", "413", "424"], "answer": 0, "topic": 1, "difficulty": 2},
+
+    {"question": "What is 4 * 3?", "options": ["12", "11", "13"], "answer": 0, "topic": 2, "difficulty": 0},
+    {"question": "What is 17 * 3?", "options": ["51", "50", "52"], "answer": 0, "topic": 2, "difficulty": 1},
+    {"question": "What is 123 * 3?", "options": ["369", "359", "379"], "answer": 0, "topic": 2, "difficulty": 2},
+
+    {"question": "What is 9 / 3?", "options": ["3", "2", "4"], "answer": 0, "topic": 3, "difficulty": 0},
+    {"question": "What is 48 / 4?", "options": ["12", "11", "13"], "answer": 0, "topic": 3, "difficulty": 1},
+    {"question": "What is 144 / 12?", "options": ["12", "11", "13"], "answer": 0, "topic": 3, "difficulty": 2},
+
+    {"question": "If you buy 3 pens at $2 each, how much?", "options": ["$6", "$5", "$7"], "answer": 0, "topic": 4, "difficulty": 1},
+    {"question": "A train travels 60 miles in 2 hours. Speed?", "options": ["30 mph", "40 mph", "50 mph"], "answer": 0, "topic": 4, "difficulty": 2},
+    {"question": "You have 5 apples. You eat 2. How many left?", "options": ["3", "4", "2"], "answer": 0, "topic": 4, "difficulty": 0},
+
+    {"question": "What is 1/2 + 1/4?", "options": ["3/4", "1/2", "2/4"], "answer": 0, "topic": 5, "difficulty": 1},
+    {"question": "What is 3/5 - 1/5?", "options": ["2/5", "3/5", "1/5"], "answer": 0, "topic": 5, "difficulty": 1},
+    {"question": "What is 0.5 + 0.25?", "options": ["0.75", "0.5", "1.0"], "answer": 0, "topic": 6, "difficulty": 1},
+    {"question": "What is 1.2 - 0.7?", "options": ["0.5", "0.6", "0.4"], "answer": 0, "topic": 6, "difficulty": 1},
+
+    {"question": "What is 9 + 3?", "options": ["12", "13", "11"], "answer": 0, "topic": 0, "difficulty": 0},
+    {"question": "What is 2 * (3 + 5)?", "options": ["16", "14", "12"], "answer": 0, "topic": 4, "difficulty": 2},
+    {"question": "If you split $10 between 2 people?", "options": ["$5", "$4", "$6"], "answer": 0, "topic": 4, "difficulty": 0},
 ]
 
-NUM_TOPICS = 3  # addition/subtraction, multiplication/division, multi-step
+
+NUM_TOPICS = 7 
 ACTION_SIZE = len(QUESTION_BANK)
 STATE_SIZE = NUM_TOPICS
 
@@ -102,8 +125,18 @@ def tebd_structured_action_selector(q_values, topics, difficulties, prev_action=
         mps = qtn.MPS_computational_state('0' * n)
         for i in range(n):
             bias = probs[i]
-            state = qu.ket([0, 1], q=[1 - bias, bias])  # encode into local amplitude
-            mps[i].modify(data=state)
+            state = np.array([np.sqrt(1 - bias), np.sqrt(bias)])
+            # encode into local amplitude
+            # Step 2: Build initial MPS with correct structure
+            mps_tensors = []
+            for i in range(n):
+                bias = probs[i]
+                data = np.array([np.sqrt(1 - bias), np.sqrt(bias)]).reshape(2, 1, 1)
+                t = qtn.Tensor(data, inds=(f"k{i}", f"b{i}_L", f"b{i}_R"))
+                mps_tensors.append(t)
+
+            mps = qtn.TensorNetwork(mps_tensors)
+
 
         # 🔁 Step 3: Apply TEBD evolution to entangle neighboring actions
         for _ in range(steps):
@@ -239,11 +272,11 @@ class DQNAgent:
 
 # --- Initialize ---
 agent = DQNAgent()
-user_knowledge = np.array([0.2, 0.2, 0.2])  # start weak in all topics
+user_knowledge = np.array([0.2] * NUM_TOPICS)
 
 # --- Interactive Loop ---
 
-for episode in range(10):
+for episode in range(25):
     print(f"\n📘 Quiz Session {episode+1}")
     state = np.copy(user_knowledge)
     
