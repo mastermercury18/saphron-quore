@@ -20,18 +20,18 @@ class Tee:
         self.terminal.flush()
         self.log.flush()
 
-sys.stdout = Tee("session_log3.txt")
+sys.stdout = Tee("session_log4.txt")
 sys.stderr = sys.stdout  # Redirect errors too
 
 
 # --- Math Questions Only ---
 QUESTION_BANK = [
-    {"question": "What is 6 + 3?", "options": ["6", "9", "12"], "answer": 1, "topic": 0},       # basic addition
-    {"question": "What is 23 + 18?", "options": ["41", "35", "31"], "answer": 0, "topic": 0},
-    {"question": "What is 12 - 5?", "options": ["6", "7", "8"], "answer": 1, "topic": 1},      # subtraction
-    {"question": "What is 63 - 12", "options": ["34", "50", "51"], "answer": 2, "topic": 1},     # multiplication
-    {"question": "What is 3 * 2", "options": ["6", "5", "4"], "answer": 0, "topic": 2},      # division
-    {"question": "What is (2 + 3) * 2?", "options": ["10", "8", "12"], "answer": 2, "topic": 2} # multi-step
+    {"question": "What is 6 + 3?", "options": ["6", "9", "12"], "answer": 1, "topic": 0, "difficulty": 0},       # basic addition
+    {"question": "What is 23 + 18?", "options": ["41", "35", "31"], "answer": 0, "topic": 0,  "difficulty": 1},
+    {"question": "What is 12 - 5?", "options": ["6", "7", "8"], "answer": 1, "topic": 1,  "difficulty": 0},      # subtraction
+    {"question": "What is 63 - 12", "options": ["34", "50", "51"], "answer": 2, "topic": 1,  "difficulty": 1},     # multiplication
+    {"question": "What is 3 * 2", "options": ["6", "5", "4"], "answer": 0, "topic": 2,  "difficulty": 1},      # division
+    {"question": "What is (2 + 3) * 2?", "options": ["10", "8", "12"], "answer": 2, "topic": 2, "difficulty": 2} # multi-step
 ]
 
 NUM_TOPICS = 3  # addition/subtraction, multiplication/division, multi-step
@@ -184,11 +184,21 @@ class DQNAgent:
     
     # Generate the Q-values list and choose the one with highest reward 
     # Use the entanglement-correlations and structural encoding of TEBD to choose the most efficient actions
-    def act(self, state):
-        q_values = list(self.model.predict(state[np.newaxis, :], verbose=0))
-        topics = [0, 1, 2]
-        difficulties = ["easy", "medium", "hard"]
-        return tebd_structured_action_selector(q_values, topics, difficulties)
+    def act(self, state, prev_action=None):
+        # Exploration
+        if np.random.rand() < self.epsilon:
+            return random.randrange(ACTION_SIZE)
+        
+        # Exploitation: structured TEBD selector
+        q_values = self.model.predict(state[np.newaxis, :], verbose=0)[0]
+
+        # Correct topic and difficulty info from QUESTION_BANK
+        topics = [q['topic'] for q in QUESTION_BANK]
+        difficulties = [q.get('difficulty', 0) for q in QUESTION_BANK]  # Example placeholder logic
+
+        # Use TEBD structured selector
+        return tebd_structured_action_selector(q_values, topics, difficulties, prev_action=prev_action)
+
 
     # INPUT: state, action, reward, next_state, done 
         # state: input vector [x, y, z] of mastery before the question
@@ -237,7 +247,7 @@ for episode in range(10):
     print(f"\n📘 Quiz Session {episode+1}")
     state = np.copy(user_knowledge)
     
-    action = agent.act(state)
+    action = agent.act(state, prev_action=action if episode > 0 else None)
     q = QUESTION_BANK[action]
     
     print(f"🧠 Q: {q['question']}")
