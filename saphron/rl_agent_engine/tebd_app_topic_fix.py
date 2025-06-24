@@ -18,10 +18,11 @@ with open("aqua_train_new.json", "r") as f:
 
 # Determine all unique topics from the question bank
 unique_topics = sorted(set(q["topic"] for q in QUESTION_BANK))
-topic_to_index = {topic: i for i, topic in enumerate(unique_topics)}
 NUM_TOPICS = len(unique_topics)
 ACTION_SIZE = len(QUESTION_BANK)
 STATE_SIZE = NUM_TOPICS
+
+print(f"Found {NUM_TOPICS} topics: {unique_topics}")
 
 # Build model
 def build_model():
@@ -118,6 +119,9 @@ def index():
     q = QUESTION_BANK[action]
     session["current_question"] = q
     session["prev_action"] = action
+    
+    print(f"Current knowledge state: {session['knowledge']}")
+    print(f"Selected question topic: {q['topic']}")
 
     return render_template("index.html", question=q["question"], options=q["options"], qid=action)
 
@@ -127,12 +131,22 @@ def submit():
     q = session["current_question"]
     correct = int(answer == q["answer"])
     topic = q["topic"]
-    topic_index = topic_to_index[topic]
-
+    
+    # Topic is already an integer index (0-9)
+    topic_index = topic
+    
+    print(f"Question topic: {topic}, topic_index: {topic_index}")
+    print(f"Knowledge before update: {session['knowledge']}")
+    
     state = np.array(session["knowledge"])
     reward = 1 if correct else 0
     if correct:
         session["knowledge"][topic_index] += 0.1
+        # Ensure knowledge doesn't exceed 1.0
+        session["knowledge"][topic_index] = min(1.0, session["knowledge"][topic_index])
+    
+    print(f"Knowledge after update: {session['knowledge']}")
+    
     next_state = np.array(session["knowledge"])
 
     agent.remember(state, session["prev_action"], reward, next_state, False)
