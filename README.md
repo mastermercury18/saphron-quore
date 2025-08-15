@@ -2,6 +2,10 @@
 
 An interactive web-based adaptive learning platform that combines **Deep Q-Learning (DQN)** with a **quantum-inspired TEBD (Time-Evolving Block Decimation)** algorithm to recommend the most effective questions to users based on their evolving mastery. The system features a modern React frontend and a Flask backend, with real-time progress tracking and a dynamic dashboard.
 
+<img width="1464" height="759" alt="Screenshot 2025-08-15 at 1 33 26 PM" src="https://github.com/user-attachments/assets/cf77ad34-c7df-4dd8-b416-1bb5144caf1a" />
+<img width="1470" height="760" alt="Screenshot 2025-08-15 at 1 32 51 PM" src="https://github.com/user-attachments/assets/1fa571a5-2c2e-418f-921e-d3e6d0d3be4b" />
+<img width="1463" height="767" alt="Screenshot 2025-08-15 at 1 33 14 PM" src="https://github.com/user-attachments/assets/5844857d-dea8-4671-bbdc-8aa70fbedf3c" />
+
 ---
 
 ## Features
